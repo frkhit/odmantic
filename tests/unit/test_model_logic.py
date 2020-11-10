@@ -1,6 +1,9 @@
+from typing import Optional
+
 import pytest
 from bson.objectid import ObjectId
 from pydantic.error_wrappers import ValidationError
+from pydantic.main import BaseModel
 
 from odmantic.exceptions import DocumentParsingError
 from odmantic.field import Field
@@ -238,3 +241,146 @@ def test_model_copy_field_modified(deep: bool):
     copied = instance.copy(update={"f": 12}, deep=deep)
     assert copied.__fields_modified__ == {"f"}
 
+
+INITIAL_FIRST_NAME, INITIAL_LAST_NAME = "INITIAL_FIRST_NAME", "INITIAL_LAST_NAME"
+PATCHED_NAME = "PATCHED_NAME"
+
+
+@pytest.fixture
+def instance_to_patch():
+    return PersonModel(first_name=INITIAL_FIRST_NAME, last_name=INITIAL_LAST_NAME)
+
+
+def test_patch_pydantic_model(instance_to_patch):
+    class Patch(BaseModel):
+        first_name: str
+
+    patch_obj = Patch(first_name=PATCHED_NAME)
+    instance_to_patch.patch(patch_obj)
+    assert instance_to_patch.first_name == PATCHED_NAME
+    assert instance_to_patch.last_name == INITIAL_LAST_NAME
+
+
+def test_patch_dictionary(instance_to_patch):
+    patch_obj = {"first_name": PATCHED_NAME}
+    instance_to_patch.patch(patch_obj)
+    assert instance_to_patch.first_name == PATCHED_NAME
+    assert instance_to_patch.last_name == INITIAL_LAST_NAME
+
+
+def test_patch_include(instance_to_patch):
+    patch_obj = {"first_name": PATCHED_NAME}
+    instance_to_patch.patch(patch_obj, include=set())
+    assert instance_to_patch.first_name == INITIAL_FIRST_NAME
+    assert instance_to_patch.last_name == INITIAL_LAST_NAME
+
+
+def test_patch_exclude(instance_to_patch):
+    patch_obj = {"first_name": PATCHED_NAME}
+    instance_to_patch.patch(patch_obj, exclude={"first_name"})
+    assert instance_to_patch.first_name == INITIAL_FIRST_NAME
+    assert instance_to_patch.last_name == INITIAL_LAST_NAME
+
+
+def test_patch_exclude_none(instance_to_patch):
+    class Patch(BaseModel):
+        first_name: Optional[str]
+        last_name: Optional[str]
+
+    patch_obj = Patch(first_name=PATCHED_NAME, last_name=None)
+    instance_to_patch.patch(patch_obj, exclude_unset=False, exclude_none=True)
+    assert instance_to_patch.first_name == PATCHED_NAME
+    assert instance_to_patch.last_name == INITIAL_LAST_NAME
+
+
+def test_patch_exclude_defaults(instance_to_patch):
+    initial_instance = instance_to_patch.copy()
+
+    class Patch(BaseModel):
+        first_name: Optional[str] = None
+        last_name: str = PATCHED_NAME
+
+    patch_obj = Patch()
+    instance_to_patch.patch(patch_obj, exclude_unset=False, exclude_defaults=True)
+    assert instance_to_patch == initial_instance
+
+
+def test_patch_exclude_over_include(instance_to_patch):
+    patch_obj = {"first_name": PATCHED_NAME}
+    instance_to_patch.patch(patch_obj, include={"first_name"}, exclude={"first_name"})
+    assert instance_to_patch.first_name == INITIAL_FIRST_NAME
+    assert instance_to_patch.last_name == INITIAL_LAST_NAME
+
+
+def test_patch_invalid():
+    class M(Model):
+        f: int
+
+    instance = M(f=12)
+    patch_obj = {"f": "aaa"}
+    with pytest.raises(ValidationError):
+        instance.patch(patch_obj)
+
+
+def test_patch_model_undue_patch_fields():
+    class M(Model):
+        f: int
+
+    instance = M(f=12)
+    patch_obj = {"not_in_model": "aaa"}
+    instance.patch(patch_obj)
+
+
+def test_patch_pydantic_unset_patch_fields():
+    PATCHED_VALUE = 100
+
+    class P(BaseModel):
+        f: int = PATCHED_VALUE
+
+    class M(Model):
+        f: int
+
+    instance = M(f=0)
+    patch_obj = P()
+    instance.patch(patch_obj)
+    assert instance.f != PATCHED_VALUE
+
+
+def test_patch_pydantic_unset_patch_fields_include_unset():
+    PATCHED_VALUE = 100
+
+    class P(BaseModel):
+        f: int = PATCHED_VALUE
+
+    class M(Model):
+        f: int
+
+    instance = M(f=0)
+    patch_obj = P()
+    instance.patch(patch_obj, exclude_unset=False)
+    assert instance.f == PATCHED_VALUE
+
+
+def test_patch_embedded_model():
+    class E(EmbeddedModel):
+        f: int
+
+    instance = E(f=12)
+    instance.patch({"f": 15})
+    assert instance.f == 15
+
+
+def test_patch_reference():
+    class R(Model):
+        f: int
+
+    class M(Model):
+        r: R = Reference()
+
+    r0 = R(f=0)
+    r1 = R(f=1)
+
+    instance = M(r=r0)
+    instance.patch({"r": r1})
+    assert instance.r.f == r1.f
+    assert instance.r == r1
