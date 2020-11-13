@@ -384,3 +384,35 @@ def test_patch_reference():
     instance.patch({"r": r1})
     assert instance.r.f == r1.f
     assert instance.r == r1
+
+
+def test_patch_type_coercion():
+    class M(Model):
+        f: int
+
+    instance = M(f=12)
+    patch_obj = {"f": "12"}
+    instance.patch(patch_obj)
+    assert isinstance(instance.f, int)
+
+
+def test_pydantic_patch():
+    from pydantic import root_validator
+
+    class Rectangle(BaseModel):
+        width: float
+        height: float
+        area: float = None
+
+        class Config:
+            validate_assignment = True
+
+        @root_validator()
+        def set_ts_now(cls, v):
+            v["area"] = v["width"] * v["height"]
+            return v
+
+    r = Rectangle(width=1, height=1)
+    assert r.area == 1
+    r.height = 5
+    assert r.area == 5

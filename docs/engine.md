@@ -168,6 +168,8 @@ this method with filtering queries.
 
 ## Update
 
+### Modify one field
+
 Updating an instance in the database can be done simply by modifying the instance
 locally and saving it again to the database.
 
@@ -224,6 +226,8 @@ Otherwise, the related document will be created in the database.
                 "name": "Shroud"
             }
             ```
+
+### Modifying a subpart of the instance
 
 ## Delete
 

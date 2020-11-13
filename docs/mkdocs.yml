@@ -10,9 +10,9 @@ site_dir: ../site
 theme:
   name: material
   palette:
-    primary: light green
-    accent: light green
-    scheme: preference
+    - primary: light green
+      accent: light green
+      scheme: slate
   icon:
     logo: material/spa
   features:
