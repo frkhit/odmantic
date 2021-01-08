@@ -1,5 +1,6 @@
 import asyncio
 import os
+from enum import Enum
 from unittest.mock import Mock
 from uuid import uuid4
 
@@ -58,3 +59,13 @@ def mock_collection(engine: AIOEngine, monkeypatch):
         return collection
 
     return f
+
+
+class MongoMode(str, Enum):
+    REPLICA = "replica"
+    SHARDED = "sharded"
+    STANDALONE = "standalone"
+    DEFAULT = "default"
+
+
+TEST_MONGO_MODE = MongoMode(os.getenv("TEST_MONGO_MODE", "default"))

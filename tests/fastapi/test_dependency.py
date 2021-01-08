@@ -5,6 +5,13 @@ from fastapi.testclient import TestClient
 from odmantic.engine import AIOEngine
 from odmantic.fastapi import AIOEngineDependency
 from odmantic.model import Model
+from tests.integration.conftest import TEST_MONGO_MODE, MongoMode
+
+pytestmark = pytest.mark.skipif(
+    TEST_MONGO_MODE != MongoMode.DEFAULT,
+    reason="Only test dependency with the default Mongo instance "
+    "running on localhost:27017",
+)
 
 
 @pytest.mark.asyncio
